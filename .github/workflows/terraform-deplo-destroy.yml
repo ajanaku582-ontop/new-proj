@@ -39,13 +39,13 @@ jobs:
           TF_VAR_key_name: ${{ secrets.TF_VAR_key_name }}
         run: echo "Terraform environment variables set"
      
-      - name: Generate terrfaorm tfvars
-        working-directory: terraform
-        run: |
-          cat <<EOF > terraform/terraform.tfvars
-          db_password = "${{ secrets.DB_PASSWORD }}"
-          key_name = "${{ secrets.KEY_NAME }}"
-          EOF
+      # - name: Generate terrfaorm tfvars
+      #   working-directory: terraform
+      #   run: |
+      #     cat <<EOF > terraform/terraform.tfvars
+      #     db_password = "${{ secrets.DB_PASSWORD }}"
+      #     key_name = "${{ secrets.KEY_NAME }}"
+      #     EOF
 
       - name: Terraform Init
         working-directory: terraform
