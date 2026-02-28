@@ -1,5 +1,14 @@
 resource "aws_db_subnet_group" "db_subnet" {
-  subnet_ids = [aws_subnet.private.id]
+  name = "tf-db-subnet"
+
+  subnet_ids = [
+    aws_subnet.private_1.id,
+    aws_subnet.private_2.id
+  ]
+
+  tags = {
+    Name = "DB subnet group"
+  }
 }
 
 resource "aws_db_instance" "postgres" {
