@@ -1,5 +1,5 @@
 variable "region" {
-  default = "us-east-1"
+  default = "us-east-2"
 }
 
 variable "vpc_cidr" {
@@ -19,7 +19,7 @@ variable "instance_type" {
 }
 
 variable "key_name" {
-  description = "SSH key"
+  description = "Name of the SSH key pair to access EC2 instances"
 }
 
 variable "db_username" {
