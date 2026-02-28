@@ -1,0 +1,23 @@
+- hosts: app
+  become: true
+  tasks:
+
+    - name: Install packages
+      yum:
+        name:
+          - python3
+          - git
+        state: present
+
+    - name: Install Flask
+      pip:
+        name: flask
+
+    - name: Copy app
+      copy:
+        src: ../app/
+        dest: /home/ec2-user/app/
+
+    - name: Run app
+      shell: |
+        nohup python3 /home/ec2-user/app/main.py &

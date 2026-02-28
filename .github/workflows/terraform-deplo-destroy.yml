@@ -1,0 +1,103 @@
+name: Deploy Infra + Configure
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Terraform Action'
+        required: true
+        default: 'plan'
+        type: choice
+        options:
+          - plan
+          - apply
+          - destroy
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-2
+
+      - name: Terraform Environment
+        env:
+          TF_IN_AUTOMATION: true
+          TF_INPUT: false
+          TF_VAR_db_password: ${{ secrets.TF_VAR_DB_PASSWORD }}
+          TF_VAR_key_name: ${{ secrets.TF_VAR_key_name }}
+        run: echo "Terraform environment variables set"
+     
+      - name: Generate terrfaorm tfvars
+        working-directory: terraform
+        run: |
+          cat <<EOF > terraform/terraform.tfvars
+          db_password = "${{ secrets.DB_PASSWORD }}"
+          key_name = "${{ secrets.KEY_NAME }}"
+          EOF
+
+      - name: Terraform Init
+        working-directory: terraform
+        run: terraform init
+
+      - name: Terraform Plan
+        if: github.event.inputs.environment == 'plan'
+        working-directory: terraform
+        run: terraform plan
+
+      - name: Terraform Apply
+        if: github.event.inputs.environment == 'apply'
+        working-directory: terraform
+        run: terraform apply -auto-approve
+
+      - name: Terraform Destroy
+        if: github.event.inputs.environment == 'destroy'
+        working-directory: terraform
+        run: terraform destroy -auto-approve
+        
+      - name: Capture Terraform Outputs
+        if: github.event.inputs.environment == 'apply'
+        working-directory: terraform
+        run: |
+          echo "BASTION_IP=$(terraform output -raw java_node_ip)" >> $GITHUB_ENV
+          
+      - name: Show Outputs
+        if: github.event.inputs.environment == 'apply'
+        run: |
+             echo "BASTION Node IP: ${{ env.BASTION_IP }}"
+
+      - name: Install Ansible
+        run: sudo apt install -y ansible
+
+      - name: Wait for SSH
+        run: sleep 60
+
+      - name: Create Ansible Inventory
+        if: github.event.inputs.environment == 'apply'
+        run: |
+          echo "[app]" > terraform/inventory.ini
+          echo "${{ env.BASTION_IP }}" >> terraform/inventory.ini
+
+      - name: Show Inventory
+        if: github.event.inputs.environment == 'apply'
+        run: cat terraform/inventory.ini
+
+      - name: test ssh connection
+        if: github.event.inputs.environment == 'apply'
+        run: |
+          ssh -o "StrictHostKeyChecking=no" -i ~/.ssh/${{ secrets.AWS_SSH_KEY }} ec2-user@${{ env.BASTION_IP }} "echo SSH connection successful"
+          chmod 400 ~/.ssh/ec2-key_name.pem
+      - name: Run Ansible
+        run: |
+          ansible-playbook -i terraform/inventory.ini ansible/playbook.yml
