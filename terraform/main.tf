@@ -33,17 +33,13 @@ resource "aws_instance" "app" {
 }
 
 resource "local_file" "inventory" {
-  filename = "inventory.ini"
-
-  content = <<EOF
+  filename = "${path.module}/inventory.ini"
+  content  = <<EOT
 [bastion]
-${aws_instance.bastion.public_ip}
+${aws_instance.bastion.public_ip} ansible_user=ec2-user ansible_ssh_private_key_file=~/.ssh/${var.key_name}.pem
 
 [app]
-${aws_instance.app.private_ip}
-
-[all:vars]
-ansible_user=ec2-user
-ansible_ssh_private_key_file=~/.ssh/${var.key_name}.pem
-EOF
+${aws_instance.app.private_ip} ansible_user=ec2-user ansible_ssh_private_key_file=~/.ssh/${var.key_name}.pem
+ansible_ssh_common_args='-o ProxyCommand="ssh -W %h:%p -i ~/.ssh/${var.key_name}.pem ec2-user@${aws_instance.bastion.public_ip}"'
+EOT
 }

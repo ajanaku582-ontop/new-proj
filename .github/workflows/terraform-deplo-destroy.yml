@@ -39,13 +39,13 @@ jobs:
           TF_VAR_key_name: ${{ secrets.TF_VAR_KEY_NAME }}
         run: echo "Terraform environment variables set"
      
-      - name: Generate terrform variables file
-        working-directory: terraform
-        run: |
-          cat <<EOF > terraform/terraform.tfvars
-          db_password = "${{ secrets.DB_PASSWORD }}"
-          key_name = "${{ secrets.KEY_NAME }}"
-          EOF
+      # - name: Generate terraform variables file
+      #   working-directory: terraform
+      #   run: |
+      #     cat <<EOF > terraform.tfvars
+      #     db_password = "${{ secrets.DB_PASSWORD }}"
+      #     key_name    = "${{ secrets.KEY_NAME }}"
+      #     EOF
 
       - name: Terraform Init
         working-directory: terraform
@@ -70,7 +70,8 @@ jobs:
         if: github.event.inputs.environment == 'apply'
         working-directory: terraform
         run: |
-          echo "BASTION_IP=$(terraform output -raw java_node_ip)" >> $GITHUB_ENV
+         echo "BASTION_IP=$(terraform output -raw bastion_ip)" >> $GITHUB_ENV
+         echo "APP_IP=$(terraform output -raw app_private_ip)" >> $GITHUB_ENV
           
       - name: Show Outputs
         if: github.event.inputs.environment == 'apply'
@@ -78,7 +79,9 @@ jobs:
              echo "BASTION Node IP: ${{ env.BASTION_IP }}"
 
       - name: Install Ansible
-        run: sudo apt install -y ansible
+        run: |
+          sudo apt update
+          sudo apt install -y ansible python3-pip
 
       - name: Wait for SSH
         run: sleep 60
@@ -86,18 +89,36 @@ jobs:
       - name: Create Ansible Inventory
         if: github.event.inputs.environment == 'apply'
         run: |
-          echo "[app]" > terraform/inventory.ini
-          echo "${{ env.BASTION_IP }}" >> terraform/inventory.ini
+          cat <<EOF > inventory.ini
+          [bastion]
+          ${{ env.BASTION_IP }}
+
+          [app]
+          ${{ env.APP_IP }}
+
+          [app:vars]
+          ansible_user=ec2-user
+          ansible_ssh_private_key_file=~/.ssh/${{ secrets.KEY_NAME }}.pem
+          ansible_ssh_common_args='-o ProxyCommand="ssh -W %h:%p -i ~/.ssh/${{ secrets.KEY_NAME }}.pem ec2-user@${{ env.BASTION_IP }}"'
+          EOF
 
       - name: Show Inventory
         if: github.event.inputs.environment == 'apply'
         run: cat terraform/inventory.ini
 
+      - name: Create SSH Key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.aws_ssh_key }}" > ~/.ssh/${{ secrets.KEY_NAME }}.pem
+          chmod 400 ~/.ssh/${{ secrets.KEY_NAME }}.pem
+
       - name: test ssh connection
         if: github.event.inputs.environment == 'apply'
         run: |
-          ssh -o "StrictHostKeyChecking=no" -i ~/.ssh/${{ secrets.AWS_SSH_KEY }} ec2-user@${{ env.BASTION_IP }} "echo SSH connection successful"
-          chmod 400 ~/.ssh/ec2-key_name.pem
+         ssh -o StrictHostKeyChecking=no -i ~/.ssh/${{ secrets.KEY_NAME }}.pem ec2-user@${{ env.BASTION_IP }} "echo SSH OK"
+          chmod 400 ~/.ssh/${{ secrets.KEY_NAME }}.pem
+
       - name: Run Ansible
+        if: github.event.inputs.environment == 'apply'
         run: |
           ansible-playbook -i terraform/inventory.ini ansible/playbook.yml
