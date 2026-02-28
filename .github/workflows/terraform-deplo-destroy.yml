@@ -36,16 +36,16 @@ jobs:
           TF_IN_AUTOMATION: true
           TF_INPUT: false
           TF_VAR_db_password: ${{ secrets.TF_VAR_DB_PASSWORD }}
-          TF_VAR_key_name: ${{ secrets.TF_VAR_key_name }}
+          TF_VAR_key_name: ${{ secrets.TF_VAR_KEY_NAME }}
         run: echo "Terraform environment variables set"
      
-      # - name: Generate terrfaorm tfvars
-      #   working-directory: terraform
-      #   run: |
-      #     cat <<EOF > terraform/terraform.tfvars
-      #     db_password = "${{ secrets.DB_PASSWORD }}"
-      #     key_name = "${{ secrets.KEY_NAME }}"
-      #     EOF
+      - name: Generate terrform variables file
+        working-directory: terraform
+        run: |
+          cat <<EOF > terraform/terraform.tfvars
+          db_password = "${{ secrets.DB_PASSWORD }}"
+          key_name = "${{ secrets.KEY_NAME }}"
+          EOF
 
       - name: Terraform Init
         working-directory: terraform
